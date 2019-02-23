@@ -1,0 +1,7 @@
+{:paths ["src"]
+ :deps {org.clojure/clojure {:mvn/version "1.9.0"}}
+ :aliases
+ {:dev {:extra-paths ["dev"]}
+  :nrepl {:extra-deps {cider/cider-nrepl {:mvn/version "0.21.0"}}}
+  :rebel {:extra-deps {com.bhauman/rebel-readline {:mvn/version "0.1.4"}}
+          :main-opts ["-m" "rebel-readline.main"]}}}
