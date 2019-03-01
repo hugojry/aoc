@@ -1,8 +1,8 @@
 {:paths ["src"]
- :deps {org.clojure/clojure {:mvn/version "1.9.0"}}
+ :deps {org.clojure/clojure {:mvn/version "1.10.0"}}
  :aliases
  {:dev {:extra-paths ["dev"]}
-  :nrepl {:extra-deps {cider/cider-nrepl {:mvn/version "0.21.0"}}}
+  :nrepl {:extra-deps {cider/cider-nrepl {:mvn/version "0.21.1"}}}
   :rebel {:extra-deps {com.bhauman/rebel-readline {:mvn/version "0.1.4"}}
           :main-opts ["-m" "rebel-readline.main"]}
   :prod {:extra-deps {leiningen {:mvn/version "2.9.0"}}}}}
