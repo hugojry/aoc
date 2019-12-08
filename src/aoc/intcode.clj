@@ -1,21 +1,8 @@
 (ns aoc.intcode)
 
-(def ^:dynamic *input*)
-
 (defn op-code
   [x]
   (mod x 100))
-
-(defn param-modes
-  [x n]
-  (loop [n n
-         modes (quot x 100)
-         params []]
-    (if (zero? n)
-      params
-      (recur (dec n)
-             (quot modes 10)
-             (conj params (mod modes 10))))))
 
 (def op-code->param-pattern
   {1 [:value :value :pointer]
@@ -27,40 +14,36 @@
    7 [:value :value :pointer]
    8 [:value :value :pointer]})
 
-(defn derefenced-params
-  [x memory pc]
-  (let [op-code (op-code x)
-        pattern (op-code->param-pattern op-code)
-        modes (param-modes x (count pattern))]
-    (loop [pc (inc pc)
-           type-modes (map vector pattern modes)
-           params []]
-      (if-some [[type mode] (first type-modes)]
-        (recur (inc pc)
-               (rest type-modes)
-               (if (= type :pointer)
-                 (conj params (nth memory pc))
-                 (if (zero? mode)
-                   (conj params (nth memory (nth memory pc)))
-                   (conj params (nth memory pc)))))
-        params))))
+(defn param-modes
+  [x]
+  (lazy-seq (cons (mod x 10) (param-modes (quot x 10)))))
+
+(defn param-values
+  [program pc instruction pattern]
+  (loop [pc (inc pc)
+         type-modes (map vector pattern (param-modes (quot instruction 100)))
+         params []]
+    (if-some [[type mode] (first type-modes)]
+      (recur (inc pc)
+             (rest type-modes)
+             (if (= type :pointer)
+               (conj params (nth program pc))
+               (if (zero? mode)
+                 (conj params (nth program (nth program pc)))
+                 (conj params (nth program pc)))))
+      params)))
 
 (defn add
-  [memory a b location]
-  (assoc memory location (+ a b)))
+  [program a b location]
+  (assoc program location (+ a b)))
 
 (defn mult
-  [memory a b location]
-  (assoc memory location (* a b)))
+  [program a b location]
+  (assoc program location (* a b)))
 
 (defn input
-  [memory location]
-  (assoc memory location *input*))
-
-(defn output
-  [memory location]
-  (println location)
-  memory)
+  [program in location]
+  (assoc program location in))
 
 (defn jump-if-true
   [pc x jump]
@@ -75,24 +58,40 @@
     (+ pc 3)))
 
 (defn less-than
-  [memory a b location]
-  (assoc memory location (if (< a b) 1 0)))
+  [program a b location]
+  (assoc program location (if (< a b) 1 0)))
 
 (defn equals
-  [memory a b location]
-  (assoc memory location (if (= a b) 1 0)))
+  [program a b location]
+  (assoc program location (if (= a b) 1 0)))
 
-(defn interpret
-  [memory pc]
-  (let [instruction (nth memory pc)
-        params (derefenced-params instruction memory pc)]
-    (case (op-code instruction)
-      1 (recur (apply add memory params) (+ pc 4))
-      2 (recur (apply mult memory params) (+ pc 4))
-      3 (recur (apply input memory params) (+ pc 2))
-      4 (recur (apply output memory params) (+ pc 2))
-      5 (recur memory (apply jump-if-true pc params))
-      6 (recur memory (apply jump-if-false pc params))
-      7 (recur (apply less-than memory params) (+ pc 4))
-      8 (recur (apply equals memory params) (+ pc 4))
-      99 memory)))
+(defn next-instruction
+  [interp]
+  (nth (:program interp) (:pc interp)))
+
+(defn available-input?
+  [interp]
+  (boolean (seq (:in interp))))
+
+(defn execute-instruction
+  [{:keys [program pc in] :as interp}]
+  (let [instruction (next-instruction interp)
+        op-code (op-code instruction)
+        params (param-values program pc instruction (op-code->param-pattern op-code))]
+    (case op-code
+      1 (assoc interp :program (apply add program params) :pc (+ pc 4))
+      2 (assoc interp :program (apply mult program params) :pc (+ pc 4))
+      3 (assoc interp
+               :program (apply input program (first in) params)
+               :pc (+ pc 2)
+               :in (rest in))
+      4 (assoc interp :out (nth program (nth program (inc pc))) :pc (+ pc 2))
+      5 (assoc interp :pc (apply jump-if-true pc params))
+      6 (assoc interp :pc (apply jump-if-false pc params))
+      7 (assoc interp
+               :program (apply less-than program params)
+               :pc (+ pc 4))
+      8 (assoc interp
+               :program (apply equals program params)
+               :pc (+ pc 4))
+      99 (assoc interp :halted? true))))
