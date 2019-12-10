@@ -9,23 +9,13 @@
       new-interp
       (recur new-interp))))
 
-(defn run-until-input-or-halt
-  [interp]
-  (if (:halted? interp)
-    interp
-    (let [instruction (ic/next-instruction interp)]
-      (if (and (= (ic/op-code instruction) 3)
-               (not (ic/available-input? interp)))
-        interp
-        (recur (ic/execute-instruction interp))))))
-
 (defn run-circuit
   [program phase-settings]
   (loop [input 0 phase-settings phase-settings]
     (if-some [phase-setting (first phase-settings)]
-      (recur (:out (run-until-output {:program program
-                                      :pc 0
-                                      :in [phase-setting input]}))
+      (recur (first (:out (run-until-output {:program program
+                                             :pc 0
+                                             :in [phase-setting input]})))
              (rest phase-settings))
       input)))
 
@@ -42,11 +32,11 @@
          i 0]
     (let [interp (nth amps i)
           with-input (update interp :in conj input)
-          new-interp (run-until-input-or-halt with-input)]
+          new-interp (ic/run-until-input-or-halt with-input)]
       (if (and (:halted? new-interp) (= i 4))
-        (:out new-interp)
+        (first (:out new-interp))
         (recur (assoc amps i (dissoc new-interp :out))
-               (:out new-interp)
+               (first (:out new-interp))
                (mod (inc i) 5))))))
 
 (comment
