@@ -5,6 +5,4 @@
  :jvm-opts ["-XX:-OmitStackTraceInFastThrow"]
  :aliases
  {:dev {:extra-paths ["dev"]
-        :extra-deps {cider/cider-nrepl {:mvn/version "0.21.1"}
-                     com.bhauman/rebel-readline {:mvn/version "0.1.4"}}}
-  :uberjar {:extra-deps {leiningen {:mvn/version "2.9.1"}}}}}
+        :extra-deps {cider/cider-nrepl {:mvn/version "0.24.0"}}}}}
