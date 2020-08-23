@@ -4,15 +4,6 @@
 (defn- upper? [ch]
   (if ch (Character/isUpperCase ch) false))
 
-(defn- exit-square
-  [maze p]
-  (let [ps (maze/next-positions p)]
-    (if-some [p (first (filter #(= (get-in maze %) \.) ps))]
-      p
-      (if-some [p (first (filter #(upper? (get-in maze %)) ps))]
-        (recur (assoc-in maze p nil) p)
-        (throw (Exception.))))))
-
 (defn- other-portal-letter
   [maze p]
   (->> (maze/next-positions p)
@@ -24,90 +15,78 @@
   [maze p]
   [(get-in maze p) (other-portal-letter maze p)])
 
-(defn ->portal-fn
-  [maze]
-  (into {} (for [x (range (count maze))
-                 y (range (count (first maze)))
-                 :let [p [x y]]
-                 :when (upper? (get-in maze p))]
-             [p (portal maze p)])))
+(defn- children
+  [maze visited path]
+  (let [position (peek path)]
+    (when-not (upper? (get-in maze position))
+      (into
+       []
+       (keep (fn [p]
+               (let [ch (get-in maze p)]
+                 (when-not (or (contains? #{\# nil} ch) (visited p))
+                   (conj path p)))))
+       (maze/next-positions position)))))
 
-(defn- exit?
-  [maze portal p]
-  (= [(get-in maze p) (other-portal-letter maze p)] portal))
-
-(defn- portal-exit
-  [maze entrance]
-  (let [portal (portal maze entrance)
-        maze* (assoc-in maze entrance nil)]
-    (first (for [x (range (count maze))
-                 y (range (count (first maze)))
-                 :let [p [x y]]
-                 :when (exit? maze* portal p)]
-             (exit-square maze p)))))
-
-(defn ->portal-exit-fn
-  [maze]
-  (into {} (for [x (range (count maze))
-                 y (range (count (first maze)))
-                 :let [p [x y]]
-                 :when (upper? (get-in maze p))]
-             [p (portal-exit maze p)])))
-
-(defn outer-portal?
+(defn- outer-portal?
   [maze [x y]]
   (let [length (count maze)
         width (count (first maze))]
     (or (contains? #{0 1 (dec length) (- length 2)} x)
         (contains? #{0 1 (dec width) (- width 2)} y))))
 
-(defn children
-  [maze portal-fn portal-exit-fn visited path]
-  (let [{:keys [position depth]} (peek path)]
-    (into
-     []
-     (comp (remove
-            (fn [p]
-              (or (contains? #{\# nil} (get-in maze p))
-                  (contains? #{[\A \A] [\Z \Z]} (portal maze p))
-                  (and (zero? depth) (outer-portal? maze p))
-                  (visited p))))
-           (map
-            (fn [p]
-              (let [ch (get-in maze p)]
-                (if (upper? ch)
-                  (conj path (let [portal (portal-fn p)]
-                               {:portal portal
-                                :position (portal-exit-fn p)
-                                :depth ((if (outer-portal? maze p)
-                                          dec inc)
-                                        depth)}))
-                  (conj path {:position p :depth depth}))))))
-     (maze/next-positions position))))
+(defn- all-starting-points
+  [maze]
+  (for [x (range (count maze))
+        y (range (count (first maze)))
+        :when (and (= (get-in maze [x y]) \.)
+                   (->> (maze/next-positions [x y])
+                        (map #(get-in maze %))
+                        (some upper?)))]
+    [x y]))
 
-(defn- end-reachable?
-  [maze position depth]
-  (and (zero? depth)
-       (some #{[\Z \Z]} (map #(portal maze %) (maze/next-positions position)))))
+(defn- bfs
+  [maze start]
+  (loop [queue (conj (clojure.lang.PersistentQueue/EMPTY) [start])
+         visited #{}
+         portals []]
+    (if-some [path (first queue)]
+      (let [position (peek path)]
+        (recur (into (pop queue) (children maze visited path))
+               (conj visited position)
+               (let [ch (get-in maze position)]
+                 (if (upper? ch)
+                   (conj portals
+                         {:portal (portal maze position)
+                          :outer? (outer-portal? maze position)
+                          :distance (dec (count path))})
+                   portals))))
+      portals)))
 
-(defn bfs
-  [maze children-fn start]
-  (loop [queue (conj (clojure.lang.PersistentQueue/EMPTY)
-                     [{:position start
-                       :depth 0}])
-         visited {}]
-    (when-some [path (first queue)]
-      (let [{:keys [position depth]} (peek path)]
-        (if (end-reachable? maze position depth)
-          path
-          (recur (into (pop queue) (children-fn (get visited depth #{}) path))
-                 (update visited depth (fnil conj #{}) position)))))))
+(defn- portal-next-to-start
+  [maze p]
+  (portal maze (first (filter
+                       (comp upper? #(get-in maze %))
+                       (maze/next-positions p)))))
+
+(defn graph
+  [maze]
+  (into {} (for [start (all-starting-points maze)]
+             [(portal-next-to-start maze start)
+              (remove (fn [node] (= (:distance node) 1)) (bfs maze start))])))
+
+;; TODO: some Dijkstra magic
 
 (comment
 
-(require '[clojure.string :as string])
+  (def maze (->maze test-2))
 
-(def test-1 "         A           
+  (all-starting-points maze)
+  (bfs maze [2 19])
+
+  (do
+    (require '[clojure.string :as string])
+
+    (def test-1 "         A           
          A           
   #######.#########  
   #######.........#  
@@ -127,7 +106,7 @@ FG..#########.....#
              Z       
              Z       ")
 
-(def test-2 "                   A               
+    (def test-2 "                   A               
                    A               
   #################.#############  
   #.#...#...................#.#.#  
@@ -165,7 +144,7 @@ YN......#               VT..#....QG
            B   J   C               
            U   P   P               ")
 
-(def test-3 "             Z L X W       C                 
+    (def test-3 "             Z L X W       C                 
              Z P Q B       K                 
   ###########.#.#.#.#######.###############  
   #...#.......#.#.......#.#.......#.#.#...#  
@@ -203,17 +182,11 @@ RE....#.#                           #......RF
                A O F   N                     
                A A D   M                     ")
 
-(def input (slurp "twenty.txt"))
+    (def input (slurp "twenty.txt"))
 
-(defn ->maze [s]
-  (maze/str->maze (string/replace s #" " "#")))
+    (defn ->maze [s]
+      (maze/str->maze (string/replace s #" " "#"))))
 
-(let [maze (->maze test-2)]
-  (bfs maze
-       (partial children
-                maze
-                (->portal-fn maze)
-                (->portal-exit-fn maze))
-       [2 19]))
-
-)
+  (let [maze (->maze test-2)]
+    (bfs maze (maze->children-fn maze) [2 19]))
+  )
