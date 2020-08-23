@@ -13,7 +13,7 @@
 
 (defn- portal
   [maze p]
-  [(get-in maze p) (other-portal-letter maze p)])
+  (sort [(get-in maze p) (other-portal-letter maze p)]))
 
 (defn- children
   [maze visited path]
@@ -31,8 +31,8 @@
   [maze [x y]]
   (let [length (count maze)
         width (count (first maze))]
-    (or (contains? #{0 1 (dec length) (- length 2)} x)
-        (contains? #{0 1 (dec width) (- width 2)} y))))
+    (or (contains? #{0 1 2 (dec length) (- length 2) (- length 3)} x)
+        (contains? #{0 1 2 (dec width) (- width 2) (- width 3)} y))))
 
 (defn- all-starting-points
   [maze]
@@ -57,7 +57,9 @@
                  (if (upper? ch)
                    (conj portals
                          {:portal (portal maze position)
-                          :outer? (outer-portal? maze position)
+                          :side (if (outer-portal? maze position)
+                                  :outer
+                                  :inner)
                           :distance (dec (count path))})
                    portals))))
       portals)))
@@ -68,13 +70,70 @@
                        (comp upper? #(get-in maze %))
                        (maze/next-positions p)))))
 
-(defn graph
+(defn ->graph
   [maze]
   (into {} (for [start (all-starting-points maze)]
-             [(portal-next-to-start maze start)
-              (remove (fn [node] (= (:distance node) 1)) (bfs maze start))])))
+             [[(if (outer-portal? maze start) :inner :outer)
+               (portal-next-to-start maze start)]
+              (remove (fn [node] (= (:distance node) 1))
+                      (bfs maze start))])))
 
 ;; TODO: some Dijkstra magic
+
+(require '[clojure.pprint :as pprint])
+
+#_(defn dijkstra-part-1
+  [graph]
+  (loop [visited #{}
+         unvisited {[\A \A] 0}]
+    (let [[portal distance]
+          (apply min-key
+                 second
+                 (remove (comp visited first) unvisited))]
+      (if (= portal [\Z \Z])
+        (dec distance)
+        (recur (conj visited portal)
+               (into unvisited
+                     (keep
+                      (fn [node]
+                        (let [portal (:portal node)
+                              new-distance (+ distance (:distance node))]
+                          (when ((fnil > Long/MAX_VALUE)
+                                 (get unvisited portal)
+                                 new-distance)
+                            [portal new-distance]))))
+                     (remove (comp visited :portal) (get graph portal))))))))
+
+(defn dijkstra-part-2
+  [graph]
+  (loop [visited #{}
+         unvisited {[0 :inner \A \A] 0}]
+    (let [[portal distance]
+          (apply min-key
+                 second
+                 (remove (comp visited first) unvisited))
+          [depth side & key] portal]
+      (if (= portal [-1 \Z \Z])
+        (dec distance)
+        (recur (conj visited [(if (= side :outer)
+                                (- depth 1/2)
+                                (+ depth 1/2))])
+               (into unvisited
+                     (keep
+                      (fn [{dist :distance :keys [portal side]}]
+                        (let [new-depth (if (= side :outer)
+                                          (dec depth)
+                                          (inc depth))
+                              portal (cons new-depth (cons side portal))
+                              new-distance (+ distance dist)]
+                          (when (and (not (visited portal))
+                                     (not= (rest portal) [\A \A])
+                                     ((fnil > Long/MAX_VALUE)
+                                      (get unvisited portal)
+                                      new-distance))
+                            [portal new-distance]))))
+                     (when (and (not (neg? depth)) (not (= key [\Z \Z])))
+                       (get graph [side key]))))))))
 
 (comment
 
