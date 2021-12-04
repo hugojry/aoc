@@ -6,61 +6,49 @@ class Square:
         self.rows = [set(row) for row in rows]
         self.cols = [{row[i] for row in rows} for i in range(len(rows[0]))]
 
-    def mark(self, x):
+    def is_bingo(self, numbers):
         for r in self.rows:
-            r.discard(x)
-        for c in self.cols:
-            c.discard(x)
-
-    def is_bingo(self):
-        for r in self.rows:
-            if not r:
+            if r <= numbers:
                 return True
         for c in self.cols:
-            if not c:
+            if c <= numbers:
                 return True
 
-    def unmarked(self):
-        return [x for r in s.rows for x in r]
-
-
-def make_squares(lines):
-    squares = []
-    for i in range(0, len(lines), 6):
-        squares.append(Square([[int(x) for x in row.rstrip().split()]
-                               for row in lines[i:i+5]]))
-    return squares
+    def unmarked(self, numbers):
+        return {x for r in self.rows for x in r if x not in numbers}
 
 
 lines = list(sys.stdin)
 bingo_numbers = [int(x) for x in lines[0].split(',')]
+squares = []
+for i in range(2, len(lines), 6):
+    squares.append(Square([[int(x) for x in row.rstrip().split()]
+                           for row in lines[i:i+5]]))
 
 # Part 1
-squares = make_squares(lines[2:])
 winner = None
+numbers = set()
 for x in bingo_numbers:
+    numbers.add(x)
     for s in squares:
-        s.mark(x)
-        if s.is_bingo():
+        if s.is_bingo(numbers):
             winner = s
             break
     if winner:
-        print(sum(winner.unmarked()) * x)
+        print(sum(winner.unmarked(numbers)) * x)
         break
-        
+
 
 # Part 2
-squares = make_squares(lines[2:])
+numbers = set()
 for i, x in enumerate(bingo_numbers):
-    for s in squares:
-        s.mark(x)
-    squares = [s for s in squares if not s.is_bingo()]
+    numbers.add(x)
+    squares = [s for s in squares if not s.is_bingo(numbers)]
     if len(squares) == 1:
-        break
-
-square = squares[0]
-for x in bingo_numbers[i+1:]:
-    square.mark(x)
-    if square.is_bingo():
-        print(sum(square.unmarked()) * x)
+        square = squares[0]
+        for x in bingo_numbers[i+1:]:
+            numbers.add(x)
+            if square.is_bingo(numbers):
+                print(sum(square.unmarked(numbers)) * x)
+                break
         break
