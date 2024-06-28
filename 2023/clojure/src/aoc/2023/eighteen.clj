@@ -18,15 +18,9 @@
 
 (defn corner-type
   [d1 d2]
-  (condp = [d1 d2]
-    ["U" "R"] :outer
-    ["U" "L"] :inner
-    ["D" "L"] :outer
-    ["D" "R"] :inner
-    ["R" "D"] :outer
-    ["R" "U"] :inner
-    ["L" "U"] :outer
-    ["L" "D"] :inner))
+  (case (str d1 d2)
+    ("UR" "DL" "RD" "LU") :outer
+    ("UL" "DR" "RU" "LD") :inner))
 
 (defn next-vertex
   [vertex direction n]
@@ -43,19 +37,18 @@
        (map #(apply corner-type %))))
 
 (defn part-1 [steps]
-  (let [corners-and-distances (->> (map #(take 2 %) steps)
-                                   (interleave (corner-types steps))
-                                   (partition 3 2))
-        vertices (reduce (fn [vertices [c1 [direction n] c2]]
-                           (conj vertices (next-vertex (peek vertices)
-                                                       direction
-                                                       (condp = [c1 c2]
-                                                         [:outer :outer] (inc n)
-                                                         [:inner :inner] (dec n)
-                                                         n))))
-                           [[0, 0]]
-                           corners-and-distances)]
-    (shoelace vertices)))
+  (->> (map #(take 2 %) steps)
+       (interleave (corner-types steps))
+       (partition 3 2)
+       (reduce (fn [vertices [c1 [direction n] c2]]
+                 (conj vertices (next-vertex (peek vertices)
+                                             direction
+                                             (condp = [c1 c2]
+                                               [:outer :outer] (inc n)
+                                               [:inner :inner] (dec n)
+                                               n))))
+               [[0, 0]])
+       shoelace))
 
 (defn part-2 [steps]
   (part-1 (map (comp (fn [code]
