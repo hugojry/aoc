@@ -8,11 +8,15 @@
              (every? pos? differences))
          (< (apply max (map abs differences)) 4))))
 
+(defn remove-at
+  [v i]
+  (into (subvec v 0 i) (subvec v (inc i))))
+
 (defn part-2-pred [report]
   (or (part-1-pred report)
       (let [v (vec report)]
         (some part-1-pred (for [i (range (count v))]
-                            (into (subvec v 0 i) (subvec v (inc i))))))))
+                            (remove-at v i))))))
 
 (comment
 
