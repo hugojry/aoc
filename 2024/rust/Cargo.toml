@@ -4,3 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+num = "0.4.3"
+regex = "1.11.1"
+
+[[bin]]
+name = "ten"
+path = "src/ten.rs"
+
+[[bin]]
+name = "thirteen"
+path = "src/thirteen.rs"
