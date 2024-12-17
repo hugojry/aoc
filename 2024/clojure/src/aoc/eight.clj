@@ -48,6 +48,6 @@
          count)))
 
 (comment
-  (def grid (make-grid (io/resource "eight.txt")))
+  (def grid (make-grid (slurp (io/resource "eight.txt"))))
   (parts grid antinodes-part-1)
   (parts grid antinodes-part-2))

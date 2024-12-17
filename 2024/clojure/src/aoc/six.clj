@@ -86,7 +86,7 @@
 
 (comment
 
-  (def grid (make-grid (io/resource "six.txt")))
+  (def grid (make-grid (slurp (io/resource "six.txt"))))
 
   (get-in (make-lab-map grid) [:rows 44])
   

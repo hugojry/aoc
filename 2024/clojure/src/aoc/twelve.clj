@@ -48,7 +48,7 @@
   (reduce + (map #(+ (outer-corners region %) (inner-corners region %)) region)))
 
 (comment
-  (def garden-map (into {} (for [[i row] (map-indexed vector (make-grid (io/resource "twelve.txt")))
+  (def garden-map (into {} (for [[i row] (map-indexed vector (make-grid (slurp (io/resource "twelve.txt"))))
                                  [j c] (map-indexed vector row)]
                               [[i j] c])))
   (def regions (make-regions garden-map))
